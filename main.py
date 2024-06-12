@@ -5,6 +5,7 @@ import csv
 import shutil
 import pdb
 import shutil
+import argparse
 
 HOST="http://localhost:8892/sparql"
 PATH_LOKET = "/home/felix/tmp/remote-loket"
@@ -76,7 +77,7 @@ def get_public_graph_data(sparql_endpoint, out_folder, filename):
     # add a graph file
     graph_file = replace_extension(filename, '.graph')
     with open(f"{out_folder}/{graph_file}", 'w') as file:
-        file.write("<http://mu.semte.ch/graphs/public>")
+        file.write("http://mu.semte.ch/graphs/public")
 
 def get_bestuurseenheden_uuid(sparql_endpoint, out_folder, filename):
    query ="""
@@ -207,6 +208,53 @@ def get_physical_files_in_subsidy_graph(sparql_endpoint, out_folder, filename, o
 
     return results
 
+def get_mock_accounts(sparql_endpoint, out_folder, filename, graph_uri):
+    query = """
+      PREFIX ext: <http://mu.semte.ch/vocabularies/ext/>
+      PREFIX mu: <http://mu.semte.ch/vocabularies/core/>
+      PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+
+      CONSTRUCT {{
+        ?person a foaf:Person ;
+          mu:uuid ?uuidPerson ;
+          foaf:account ?account ;
+          foaf:familyName ?label ;
+          foaf:firstName ?classificationLabel ;
+          foaf:member ?eenheid .
+
+        ?account a foaf:OnlineAccount ;
+          mu:uuid ?uuidAccount ;
+          ext:sessionRole "LoketLB-subsidies" ;
+          foaf:accountServiceHomepage <https://github.com/lblod/mock-login-service> .
+       }}
+       WHERE {{
+
+         VALUES ?orgGraph {{
+           <{0}>
+         }}
+
+         GRAPH ?orgGraph {{
+            ?person a foaf:Person ;
+              mu:uuid ?uuidPerson ;
+              foaf:account ?account ;
+              foaf:familyName ?label ;
+              foaf:firstName ?classificationLabel ;
+              foaf:member ?eenheid .
+
+            ?account a foaf:OnlineAccount ;
+              mu:uuid ?uuidAccount ;
+              ext:sessionRole ?role ;
+              foaf:accountServiceHomepage <https://github.com/lblod/mock-login-service> .
+         }}
+       }}
+    """.format(graph_uri)
+
+    get_ttl(sparql_endpoint, query, out_folder, filename)
+    # add a graph file
+    graph_file = replace_extension(filename, '.graph')
+    with open(f"{out_folder}/{graph_file}", 'w') as file:
+        file.write(graph_uri)
+
 def copy_bijlage(share_uri, path_loket, target_folder):
     # note mounting a folder over sshfs
     # mkdir /home/felix/tmp/remote-loket
@@ -254,7 +302,31 @@ def copy_files_skip_existing(src, dest):
             else:
                 print(f"skipping {dest_path}, because it exists")
 
+def parse_cli_arguments():
+    parser = argparse.ArgumentParser(description='Export subisidy data')
+
+    parser.add_argument('-s', '--sparql_endpoint', type=str, help='Loket Database SPARQL endpoint')
+    parser.add_argument('-l', '--loket_path', type=str, help='Absolute path to loket application')
+    args = parser.parse_args()
+    return args
+
+    # Implementing the logic based on the arguments
+    if args.sparql_endpoint:
+        HOST = args.sparql_endpoint
+
+    if args.loket_path:
+        PATH_LOKET = args.loket_path
+
 if __name__ == "__main__":
+    args = parse_cli_arguments()
+    if args.sparql_endpoint:
+        HOST = args.sparql_endpoint
+
+    if args.loket_path:
+        PATH_LOKET = args.loket_path
+
+    print(f"Running with {HOST}, {PATH_LOKET}")
+
     out_folder = './output'
     ensure_folder_exists(out_folder)
     csv_folder = f"{out_folder}/csv"
@@ -290,12 +362,22 @@ if __name__ == "__main__":
         get_users_linked_to_subsidy_graph(HOST, migrations_folder, users_ttl, subsidy_graph, users_graph)
         print("Dumped users data")
 
+        mock_users_ttl = get_timestamped_file_name(f'mock-users-{uuid}.ttl')
+        get_mock_accounts(HOST, migrations_folder, mock_users_ttl, users_graph)
+        print("Dumped mock accounts for org graph")
+
         print("Starting with attachments")
         share_uris_csv = get_timestamped_file_name(f'physical-files-{uuid}.csv')
         file_uris = get_physical_files_in_subsidy_graph(HOST, csv_folder, share_uris_csv, subsidy_graph)
         for i, share_uri in enumerate(file_uris):
             print(f"Copying is {i + 1} of {len(file_uris)} attachments")
             copy_bijlage(share_uri, PATH_LOKET, data_folder)
+
+    print("Finished org specific stuff.")
+
+    mock_users_ttl = get_timestamped_file_name(f'mock-users-public.ttl')
+    get_mock_accounts(HOST, migrations_folder, mock_users_ttl, "http://mu.semte.ch/graphs/public")
+    print("Dumped mock accounts for public graph")
 
     print("Copying the remaining files")
     copy_remaining_files(PATH_LOKET, data_folder)
