@@ -6,9 +6,10 @@ import shutil
 import pdb
 import shutil
 import argparse
+import time
 
-HOST="http://localhost:8892/sparql"
-PATH_LOKET = "/home/felix/tmp/remote-loket"
+HOST="http://localhost:8890/sparql"
+PATH_LOKET = "/data/app-digitaal-loket"
 
 def get_csv(sparql_endpoint, query, out_folder, filename):
     response = requests.get(
@@ -246,6 +247,16 @@ def get_mock_accounts(sparql_endpoint, out_folder, filename, graph_uri):
               ext:sessionRole ?role ;
               foaf:accountServiceHomepage <https://github.com/lblod/mock-login-service> .
          }}
+
+         FILTER NOT EXISTS {{
+           VALUES ?class {{
+            <http://data.lblod.info/vocabularies/erediensten/BestuurVanDeEredienst>
+            <http://data.lblod.info/vocabularies/erediensten/CentraalBestuurVanDeEredienst>
+            <http://data.lblod.info/vocabularies/erediensten/RepresentatiefOrgaan>
+           }}
+           ?eenheid a ?class.
+         }}
+
        }}
     """.format(graph_uri)
 
@@ -279,6 +290,7 @@ def replace_extension(file_path, new_extension):
 
 def get_timestamped_file_name(file_name):
     current_date = datetime.now()
+    time.sleep(1) # to ensure time stamp move
     timestamp = current_date.strftime('%Y%m%d%H%M%S')
     file_name = f"{timestamp}-{file_name}"
     return file_name
@@ -303,19 +315,17 @@ def copy_files_skip_existing(src, dest):
                 print(f"skipping {dest_path}, because it exists")
 
 def parse_cli_arguments():
+    def comma_separated_list(value):
+        return value.split(',')
+
     parser = argparse.ArgumentParser(description='Export subisidy data')
 
     parser.add_argument('-s', '--sparql_endpoint', type=str, help='Loket Database SPARQL endpoint')
     parser.add_argument('-l', '--loket_path', type=str, help='Absolute path to loket application')
+    parser.add_argument('-e', '--eenheden', type=comma_separated_list, help='Dump data for a specific list eenheden; provide uuids')
     args = parser.parse_args()
+
     return args
-
-    # Implementing the logic based on the arguments
-    if args.sparql_endpoint:
-        HOST = args.sparql_endpoint
-
-    if args.loket_path:
-        PATH_LOKET = args.loket_path
 
 if __name__ == "__main__":
     args = parse_cli_arguments()
@@ -346,11 +356,13 @@ if __name__ == "__main__":
     get_public_graph_data(HOST, migrations_folder, public_graph_file)
     print("Finished dumping public graph")
 
-    all_uuids = [uuids[0]]
+    all_uuids = uuids
+    if args.eenheden:
+        all_uuids = args.eenheden
 
     for index, uuid in enumerate(all_uuids):
         print(f"Fetching all data for bestuurseenheden with uuid: {uuid}")
-        print(f"This is {index + 1} of {len(uuid)}")
+        print(f"This is {index + 1} of {len(all_uuid)}")
 
         subsidy_graph = f"http://mu.semte.ch/graphs/organizations/{uuid}/LoketLB-subsidies"
         subsidy_ttl = get_timestamped_file_name(f'dump-graph-subsidies-{uuid}.ttl')
