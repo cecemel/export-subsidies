@@ -279,7 +279,9 @@ def copy_bijlage(share_uri, path_loket, target_folder):
     if(os.path.exists(full_target)):
         return
 
-    shutil.copy2(f"{path_loket}/data/files/{file_name}", full_target)
+    source_path = f"{path_loket}/data/files/{file_name}"
+    if(os.path.exists(source_path)):
+        shutil.copy2(source_path, full_target)
 
 def copy_remaining_files(path_loket, target_folder):
     copy_files_skip_existing(f"{path_loket}/data/files/subsidies", f"{target_folder}/subsidies")
@@ -346,7 +348,7 @@ if __name__ == "__main__":
     migrations_folder = f"{out_folder}/migrations"
     ensure_folder_exists(migrations_folder)
 
-    print("Getting bestuurseenheden")
+    print("Getting bestuurseenheden UUID's")
     uuids_file = get_timestamped_file_name('bestuurseenheden_uuid.csv')
     uuids = get_bestuurseenheden_uuid(HOST, csv_folder, uuids_file)
     print(f"Found {len(uuids)} bestuurseenheden")
