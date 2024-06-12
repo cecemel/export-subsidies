@@ -4,9 +4,10 @@ from datetime import datetime
 import csv
 import shutil
 import pdb
+import shutil
 
 HOST="http://localhost:8892/sparql"
-PATH_LOKET = ""
+PATH_LOKET = "/home/felix/tmp/remote-loket"
 
 def get_csv(sparql_endpoint, query, out_folder, filename):
     response = requests.get(
@@ -103,10 +104,9 @@ def get_bestuurseenheden_uuid(sparql_endpoint, out_folder, filename):
    results = []
    with open(f"{out_folder}/{filename}", mode='r') as file:
        csv_reader = csv.reader(file)
-       header = next(csv_reader)
-       next(csv_reader) # skip  firstrow
-       for row in csv_reader:
-           results.append(row[0])
+       rows = list(csv_reader)[1:] # skip first row
+       for row in rows:
+           results.append(row[0]) # unnest
 
    return results
 
@@ -201,12 +201,23 @@ def get_physical_files_in_subsidy_graph(sparql_endpoint, out_folder, filename, o
     get_csv(sparql_endpoint, query, out_folder, filename)
     with open(f"{out_folder}/{filename}", mode='r') as file:
         csv_reader = csv.reader(file)
-        header = next(csv_reader)
-        next(csv_reader) # skip  firstrow
-        for row in csv_reader:
-            results.append(row[0])
+        rows = list(csv_reader)[1:] # skip first row
+        for row in rows:
+            results.append(row[0]) # unnest
 
     return results
+
+def copy_bijlage(share_uri, path_loket, target_folder):
+    # note mounting a folder over sshfs
+    # mkdir /home/felix/tmp/remote-loket
+    # sshfs charlie:/data/app-digitaal-loket /home/felix/tmp/remote-loket
+    if not share_uri.startswith("share://"):
+        return
+    file_name = share_uri.removeprefix("share://")
+    shutil.copy(f"{path_loket}/data/files/{file_name}", f"{target_folder}/{file_name}")
+
+def copy_remaining_files(path_loket, target_folder):
+    shutil.copytree(f"{path_loket}/data/files/subsidies", f"{target_folder}/subsidies")
 
 def replace_extension(file_path, new_extension):
     base = os.path.splitext(file_path)[0]
@@ -228,7 +239,7 @@ if __name__ == "__main__":
     ensure_folder_exists(out_folder)
     csv_folder = f"{out_folder}/csv"
     ensure_folder_exists(csv_folder)
-    data_folder = f"{out_folder}/data"
+    data_folder = f"{out_folder}/data/files"
     ensure_folder_exists(data_folder)
     migrations_folder = f"{out_folder}/migrations"
     ensure_folder_exists(migrations_folder)
@@ -237,7 +248,7 @@ if __name__ == "__main__":
     uuids = get_bestuurseenheden_uuid(HOST, csv_folder, uuids_file)
 
     public_graph_file = get_timestamped_file_name(f'dump-graph-subsidies-public.ttl')
-    get_public_graph_data(HOST, migrations_folder, public_graph_file)
+    #get_public_graph_data(HOST, migrations_folder, public_graph_file)
 
     for uuid in [uuids[0]]:
         subsidy_graph = f"http://mu.semte.ch/graphs/organizations/{uuid}/LoketLB-subsidies"
@@ -249,4 +260,8 @@ if __name__ == "__main__":
         get_users_linked_to_subsidy_graph(HOST, migrations_folder, users_ttl, subsidy_graph, users_graph)
 
         share_uris_csv = get_timestamped_file_name(f'physical-files-{uuid}.csv')
-        get_physical_files_in_subsidy_graph(HOST, csv_folder, share_uris_csv, subsidy_graph)
+        file_uris = get_physical_files_in_subsidy_graph(HOST, csv_folder, share_uris_csv, subsidy_graph)
+        for share_uri in file_uris:
+            copy_bijlage(share_uri, PATH_LOKET, data_folder)
+
+    copy_remaining_files(PATH_LOKET, data_folder)
