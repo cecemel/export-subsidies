@@ -8,7 +8,7 @@ import shutil
 import argparse
 import time
 
-HOST="http://localhost:8890/sparql"
+HOST="http://virtuoso:8890/sparql"
 PATH_LOKET = "/data/app-digitaal-loket"
 
 def get_csv(sparql_endpoint, query, out_folder, filename):
@@ -282,6 +282,8 @@ def copy_bijlage(share_uri, path_loket, target_folder):
     source_path = f"{path_loket}/data/files/{file_name}"
     if(os.path.exists(source_path)):
         shutil.copy2(source_path, full_target)
+    else:
+        print(f"Bijlage on {source_path} not found.")
 
 def copy_remaining_files(path_loket, target_folder):
     copy_files_skip_existing(f"{path_loket}/data/files/subsidies", f"{target_folder}/subsidies")
@@ -364,7 +366,7 @@ if __name__ == "__main__":
 
     for index, uuid in enumerate(all_uuids):
         print(f"Fetching all data for bestuurseenheden with uuid: {uuid}")
-        print(f"This is {index + 1} of {len(all_uuid)}")
+        print(f"This is {index + 1} of {len(all_uuids)}")
 
         subsidy_graph = f"http://mu.semte.ch/graphs/organizations/{uuid}/LoketLB-subsidies"
         subsidy_ttl = get_timestamped_file_name(f'dump-graph-subsidies-{uuid}.ttl')
