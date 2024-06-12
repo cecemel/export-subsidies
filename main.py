@@ -213,11 +213,17 @@ def copy_bijlage(share_uri, path_loket, target_folder):
     # sshfs charlie:/data/app-digitaal-loket /home/felix/tmp/remote-loket
     if not share_uri.startswith("share://"):
         return
+
     file_name = share_uri.removeprefix("share://")
-    shutil.copy(f"{path_loket}/data/files/{file_name}", f"{target_folder}/{file_name}")
+    full_target = f"{target_folder}/{file_name}"
+
+    if(os.path.exists(full_target)):
+        return
+
+    shutil.copy2(f"{path_loket}/data/files/{file_name}", full_target)
 
 def copy_remaining_files(path_loket, target_folder):
-    shutil.copytree(f"{path_loket}/data/files/subsidies", f"{target_folder}/subsidies")
+    copy_files_skip_existing(f"{path_loket}/data/files/subsidies", f"{target_folder}/subsidies")
 
 def replace_extension(file_path, new_extension):
     base = os.path.splitext(file_path)[0]
@@ -232,7 +238,21 @@ def get_timestamped_file_name(file_name):
 def ensure_folder_exists(path):
     if not os.path.exists(path):
         os.makedirs(path)
-    print(f"Folder '{path}' is ready.")
+
+def copy_files_skip_existing(src, dest):
+    ensure_folder_exists(dest)
+
+    for item in os.listdir(src):
+        src_path = os.path.join(src, item)
+        dest_path = os.path.join(dest, item)
+
+        if os.path.isdir(src_path):
+            copy_files_skip_existing(src_path, dest_path) # recursive call
+        else:
+            if not os.path.exists(dest_path):
+                shutil.copy2(src_path, dest_path)
+            else:
+                print(f"skipping {dest_path}, because it exists")
 
 if __name__ == "__main__":
     out_folder = './output'
@@ -244,24 +264,39 @@ if __name__ == "__main__":
     migrations_folder = f"{out_folder}/migrations"
     ensure_folder_exists(migrations_folder)
 
+    print("Getting bestuurseenheden")
     uuids_file = get_timestamped_file_name('bestuurseenheden_uuid.csv')
     uuids = get_bestuurseenheden_uuid(HOST, csv_folder, uuids_file)
+    print(f"Found {len(uuids)} bestuurseenheden")
 
+    print("Dumping public graph")
     public_graph_file = get_timestamped_file_name(f'dump-graph-subsidies-public.ttl')
-    #get_public_graph_data(HOST, migrations_folder, public_graph_file)
+    get_public_graph_data(HOST, migrations_folder, public_graph_file)
+    print("Finished dumping public graph")
 
-    for uuid in [uuids[0]]:
+    all_uuids = [uuids[0]]
+
+    for index, uuid in enumerate(all_uuids):
+        print(f"Fetching all data for bestuurseenheden with uuid: {uuid}")
+        print(f"This is {index + 1} of {len(uuid)}")
+
         subsidy_graph = f"http://mu.semte.ch/graphs/organizations/{uuid}/LoketLB-subsidies"
         subsidy_ttl = get_timestamped_file_name(f'dump-graph-subsidies-{uuid}.ttl')
         get_subsidies_graph(HOST, migrations_folder, subsidy_ttl, subsidy_graph)
+        print("Dumped subsidy graph")
 
         users_graph = f"http://mu.semte.ch/graphs/organizations/{uuid}"
         users_ttl = get_timestamped_file_name(f'dump-graph-users-{uuid}.ttl')
         get_users_linked_to_subsidy_graph(HOST, migrations_folder, users_ttl, subsidy_graph, users_graph)
+        print("Dumped users data")
 
+        print("Starting with attachments")
         share_uris_csv = get_timestamped_file_name(f'physical-files-{uuid}.csv')
         file_uris = get_physical_files_in_subsidy_graph(HOST, csv_folder, share_uris_csv, subsidy_graph)
-        for share_uri in file_uris:
+        for i, share_uri in enumerate(file_uris):
+            print(f"Copying is {i + 1} of {len(file_uris)} attachments")
             copy_bijlage(share_uri, PATH_LOKET, data_folder)
 
+    print("Copying the remaining files")
     copy_remaining_files(PATH_LOKET, data_folder)
+    print("Done")
