@@ -7,10 +7,33 @@ import pdb
 import shutil
 import argparse
 import time
+from functools import wraps
 
 HOST="http://virtuoso:8890/sparql"
 PATH_LOKET = "/data/app-digitaal-loket"
 
+def retry_on_exception(retries: int = 3, delay: int = 1):
+    """
+    Decorator that retries a function if an exception occurs.
+    Used mainly for fetching data from virtuoso
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            attempts = 0
+            while attempts < retries:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    attempts += 1
+                    if attempts >= retries:
+                        raise
+                    print(f"Exception occurred: {e}. Retrying {attempts}/{retries} in {delay} seconds...")
+                    time.sleep(delay)
+        return wrapper
+    return decorator
+
+@retry_on_exception(retries=3, delay=2)
 def get_csv(sparql_endpoint, query, out_folder, filename):
     response = requests.get(
         sparql_endpoint,
@@ -24,6 +47,7 @@ def get_csv(sparql_endpoint, query, out_folder, filename):
     else:
         print(f"Request failed with status code: {response.status_code}")
 
+@retry_on_exception(retries=3, delay=2)
 def get_ttl(sparql_endpoint, query, out_folder, filename):
     response = requests.post(
         sparql_endpoint,
@@ -100,6 +124,7 @@ def get_bestuurseenheden_uuid(sparql_endpoint, out_folder, filename):
          ?eenheid a ?class.
          }
       }
+      ORDER BY ?uuid
    """
    get_csv(sparql_endpoint, query, out_folder, filename)
 
