@@ -8,6 +8,7 @@ import shutil
 import argparse
 import time
 from functools import wraps
+import multiprocessing
 
 HOST="http://virtuoso:8890/sparql"
 PATH_LOKET = "/data/app-digitaal-loket"
@@ -313,8 +314,11 @@ def process_data_for_bestuurseenheid(uuid, index, all_uuids, HOST, migrations_fo
     share_uris_csv = get_timestamped_file_name(f'physical-files-{uuid}.csv')
     file_uris = get_physical_files_in_subsidy_graph(HOST, csv_folder, share_uris_csv, subsidy_graph)
     for i, share_uri in enumerate(file_uris):
-        print(f"Copying is {i + 1} of {len(file_uris)} attachments")
+        print(f"Copying is {i + 1} of {len(file_uris)} attachments for {uuid}")
         copy_bijlage(share_uri, PATH_LOKET, data_folder)
+
+    print(f"Finished fetching all data for bestuurseenheden with uuid: {uuid}")
+    print(f"This was for {index + 1} of {len(all_uuids)}")
 
 def copy_bijlage(share_uri, path_loket, target_folder):
     # note mounting a folder over sshfs
@@ -327,6 +331,7 @@ def copy_bijlage(share_uri, path_loket, target_folder):
     full_target = f"{target_folder}/{file_name}"
 
     if(os.path.exists(full_target)):
+        print(f"{full_target} already downloaded...")
         return
 
     source_path = f"{path_loket}/data/files/{file_name}"
@@ -377,6 +382,7 @@ def parse_cli_arguments():
     parser.add_argument('-s', '--sparql_endpoint', type=str, help='Loket Database SPARQL endpoint')
     parser.add_argument('-l', '--loket_path', type=str, help='Absolute path to loket application')
     parser.add_argument('-e', '--eenheden', type=comma_separated_list, help='Dump data for a specific list eenheden; provide uuids')
+    parser.add_argument('-p', '--processes', type=int, help='This provides the number of parallel processes (default 1)')
     args = parser.parse_args()
 
     return args
@@ -414,10 +420,24 @@ if __name__ == "__main__":
     if args.eenheden:
         all_uuids = args.eenheden
 
+    # START: parallelize the processing
+    tasks = []
     for index, uuid in enumerate(all_uuids):
-        process_data_for_bestuurseenheid(uuid, index, all_uuids, HOST,
-                                         migrations_folder, csv_folder,
-                                         PATH_LOKET, data_folder)
+        tasks.append((uuid, index, all_uuids, HOST,
+                      migrations_folder, csv_folder,
+                      PATH_LOKET, data_folder))
+
+    number_of_processes = 1
+    if(args.processes):
+        print(f"Running number of processes {args.processes}")
+        number_of_processes = args.processes
+
+    pool = multiprocessing.Pool(processes=number_of_processes)
+    results = pool.starmap(process_data_for_bestuurseenheid, tasks)
+
+    pool.close()
+    pool.join()
+    # END: parallelize the processing
 
     print("Finished org specific stuff.")
 
