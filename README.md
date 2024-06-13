@@ -2,7 +2,7 @@
 Script to export subsidy-related data in preparation for app-subsidiepunt.
 ### CLI options
 ```
-usage: main.py [-h] [-s SPARQL_ENDPOINT] [-l LOKET_PATH] [-e EENHEDEN]
+usage: main.py [-h] [-s SPARQL_ENDPOINT] [-l LOKET_PATH] [-e EENHEDEN] [-p PROCESSES]
 
 Export subisidy data
 
@@ -14,7 +14,8 @@ options:
                         Absolute path to loket application
   -e EENHEDEN, --eenheden EENHEDEN
                         Dump data for a specific list eenheden; provide uuids
-
+  -p PROCESSES, --processes PROCESSES
+                        This provides the number of parallel processes (default 1)
 ```
 ## Run
 ### Docker
@@ -30,7 +31,7 @@ export-subsidy-data:
   volumes:
     -  ./:/data/app-digitaal-loket
     - ./export-subsidy-data:/app/output
-  entrypoint: [ "python", "main.py" ]
+  entrypoint: [ "python", "main.py", "-p", "4" ]
 ```
 #### Example
 On my machine I run. This is an example, your parameters may vary.
