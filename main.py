@@ -291,6 +291,31 @@ def get_mock_accounts(sparql_endpoint, out_folder, filename, graph_uri):
     with open(f"{out_folder}/{graph_file}", 'w') as file:
         file.write(graph_uri)
 
+def process_data_for_bestuurseenheid(uuid, index, all_uuids, HOST, migrations_folder, csv_folder, PATH_LOKET, data_folder):
+    print(f"Fetching all data for bestuurseenheden with uuid: {uuid}")
+    print(f"This is {index + 1} of {len(all_uuids)}")
+
+    subsidy_graph = f"http://mu.semte.ch/graphs/organizations/{uuid}/LoketLB-subsidies"
+    subsidy_ttl = get_timestamped_file_name(f'dump-graph-subsidies-{uuid}.ttl')
+    get_subsidies_graph(HOST, migrations_folder, subsidy_ttl, subsidy_graph)
+    print("Dumped subsidy graph")
+
+    users_graph = f"http://mu.semte.ch/graphs/organizations/{uuid}"
+    users_ttl = get_timestamped_file_name(f'dump-graph-users-{uuid}.ttl')
+    get_users_linked_to_subsidy_graph(HOST, migrations_folder, users_ttl, subsidy_graph, users_graph)
+    print("Dumped users data")
+
+    mock_users_ttl = get_timestamped_file_name(f'mock-users-{uuid}.ttl')
+    get_mock_accounts(HOST, migrations_folder, mock_users_ttl, users_graph)
+    print("Dumped mock accounts for org graph")
+
+    print("Starting with attachments")
+    share_uris_csv = get_timestamped_file_name(f'physical-files-{uuid}.csv')
+    file_uris = get_physical_files_in_subsidy_graph(HOST, csv_folder, share_uris_csv, subsidy_graph)
+    for i, share_uri in enumerate(file_uris):
+        print(f"Copying is {i + 1} of {len(file_uris)} attachments")
+        copy_bijlage(share_uri, PATH_LOKET, data_folder)
+
 def copy_bijlage(share_uri, path_loket, target_folder):
     # note mounting a folder over sshfs
     # mkdir /home/felix/tmp/remote-loket
@@ -390,29 +415,9 @@ if __name__ == "__main__":
         all_uuids = args.eenheden
 
     for index, uuid in enumerate(all_uuids):
-        print(f"Fetching all data for bestuurseenheden with uuid: {uuid}")
-        print(f"This is {index + 1} of {len(all_uuids)}")
-
-        subsidy_graph = f"http://mu.semte.ch/graphs/organizations/{uuid}/LoketLB-subsidies"
-        subsidy_ttl = get_timestamped_file_name(f'dump-graph-subsidies-{uuid}.ttl')
-        get_subsidies_graph(HOST, migrations_folder, subsidy_ttl, subsidy_graph)
-        print("Dumped subsidy graph")
-
-        users_graph = f"http://mu.semte.ch/graphs/organizations/{uuid}"
-        users_ttl = get_timestamped_file_name(f'dump-graph-users-{uuid}.ttl')
-        get_users_linked_to_subsidy_graph(HOST, migrations_folder, users_ttl, subsidy_graph, users_graph)
-        print("Dumped users data")
-
-        mock_users_ttl = get_timestamped_file_name(f'mock-users-{uuid}.ttl')
-        get_mock_accounts(HOST, migrations_folder, mock_users_ttl, users_graph)
-        print("Dumped mock accounts for org graph")
-
-        print("Starting with attachments")
-        share_uris_csv = get_timestamped_file_name(f'physical-files-{uuid}.csv')
-        file_uris = get_physical_files_in_subsidy_graph(HOST, csv_folder, share_uris_csv, subsidy_graph)
-        for i, share_uri in enumerate(file_uris):
-            print(f"Copying is {i + 1} of {len(file_uris)} attachments")
-            copy_bijlage(share_uri, PATH_LOKET, data_folder)
+        process_data_for_bestuurseenheid(uuid, index, all_uuids, HOST,
+                                         migrations_folder, csv_folder,
+                                         PATH_LOKET, data_folder)
 
     print("Finished org specific stuff.")
 
