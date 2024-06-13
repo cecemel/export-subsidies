@@ -34,7 +34,7 @@ def retry_on_exception(retries: int = 3, delay: int = 1):
         return wrapper
     return decorator
 
-@retry_on_exception(retries=3, delay=2)
+@retry_on_exception(retries=3, delay=60)
 def get_csv(sparql_endpoint, query, out_folder, filename):
     response = requests.get(
         sparql_endpoint,
@@ -48,7 +48,7 @@ def get_csv(sparql_endpoint, query, out_folder, filename):
     else:
         print(f"Request failed with status code: {response.status_code}")
 
-@retry_on_exception(retries=3, delay=2)
+@retry_on_exception(retries=3, delay=60)
 def get_ttl(sparql_endpoint, query, out_folder, filename):
     response = requests.post(
         sparql_endpoint,
