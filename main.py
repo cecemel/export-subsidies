@@ -313,6 +313,7 @@ def process_data_for_bestuurseenheid(uuid, index, all_uuids, HOST, migrations_fo
     print("Starting with attachments")
     share_uris_csv = get_timestamped_file_name(f'physical-files-{uuid}.csv')
     file_uris = get_physical_files_in_subsidy_graph(HOST, csv_folder, share_uris_csv, subsidy_graph)
+    print(f"Found: {len(file_uris)} attachments for {uuid}")
     for i, share_uri in enumerate(file_uris):
         print(f"Copying is {i + 1} of {len(file_uris)} attachments for {uuid}")
         copy_bijlage(share_uri, PATH_LOKET, data_folder)
