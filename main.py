@@ -251,7 +251,7 @@ def get_mock_accounts(sparql_endpoint, out_folder, filename, graph_uri):
 
         ?account a foaf:OnlineAccount ;
           mu:uuid ?uuidAccount ;
-          ext:sessionRole "LoketLB-subsidies" ;
+          ext:sessionRole "SubsidiepuntGebruikers" ;
           foaf:accountServiceHomepage <https://github.com/lblod/mock-login-service> .
        }}
        WHERE {{
