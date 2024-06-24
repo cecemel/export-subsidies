@@ -138,7 +138,7 @@ def get_bestuurseenheden_uuid(sparql_endpoint, out_folder, filename):
 
    return results
 
-def get_subsidies_graph(sparql_endpoint, out_folder, filename, org_uri):
+def get_subsidies_graph(sparql_endpoint, out_folder, filename, org_uri, target_org_uri):
     query = """
       PREFIX ext: <http://mu.semte.ch/vocabularies/ext/>
       CONSTRUCT {{
@@ -158,7 +158,7 @@ def get_subsidies_graph(sparql_endpoint, out_folder, filename, org_uri):
     # add a graph file
     graph_file = replace_extension(filename, '.graph')
     with open(f"{out_folder}/{graph_file}", 'w') as file:
-        file.write(org_uri)
+        file.write(target_org_uri)
 
 def get_users_linked_to_subsidy_graph(sparql_endpoint, out_folder, filename, subsidy_uri, org_uri):
     query = """
@@ -251,7 +251,7 @@ def get_mock_accounts(sparql_endpoint, out_folder, filename, graph_uri):
 
         ?account a foaf:OnlineAccount ;
           mu:uuid ?uuidAccount ;
-          ext:sessionRole "SubsidiepuntGebruikers" ;
+          ext:sessionRole "SubsidiepuntGebruiker" ;
           foaf:accountServiceHomepage <https://github.com/lblod/mock-login-service> .
        }}
        WHERE {{
@@ -296,14 +296,15 @@ def process_data_for_bestuurseenheid(uuid, index, all_uuids, HOST, migrations_fo
     print(f"Fetching all data for bestuurseenheden with uuid: {uuid}")
     print(f"This is {index + 1} of {len(all_uuids)}")
 
-    subsidy_graph = f"http://mu.semte.ch/graphs/organizations/{uuid}/SubsidiepuntGebruiker"
+    orig_subsidy_graph = f"http://mu.semte.ch/graphs/organizations/{uuid}/LoketLB-subsidies"
+    target_subsidy_graph = = f"http://mu.semte.ch/graphs/organizations/{uuid}/SubsidiepuntGebruiker"
     subsidy_ttl = get_timestamped_file_name(f'dump-graph-subsidies-{uuid}.ttl')
-    get_subsidies_graph(HOST, migrations_folder, subsidy_ttl, subsidy_graph)
+    get_subsidies_graph(HOST, migrations_folder, subsidy_ttl, orig_subsidy_graph, target_subsidy_graph)
     print("Dumped subsidy graph")
 
     users_graph = f"http://mu.semte.ch/graphs/organizations/{uuid}"
     users_ttl = get_timestamped_file_name(f'dump-graph-users-{uuid}.ttl')
-    get_users_linked_to_subsidy_graph(HOST, migrations_folder, users_ttl, subsidy_graph, users_graph)
+    get_users_linked_to_subsidy_graph(HOST, migrations_folder, users_ttl, orig_subsidy_graph, users_graph)
     print("Dumped users data")
 
     mock_users_ttl = get_timestamped_file_name(f'mock-users-{uuid}.ttl')
@@ -312,7 +313,7 @@ def process_data_for_bestuurseenheid(uuid, index, all_uuids, HOST, migrations_fo
 
     print("Starting with attachments")
     share_uris_csv = get_timestamped_file_name(f'physical-files-{uuid}.csv')
-    file_uris = get_physical_files_in_subsidy_graph(HOST, csv_folder, share_uris_csv, subsidy_graph)
+    file_uris = get_physical_files_in_subsidy_graph(HOST, csv_folder, share_uris_csv, orig_subsidy_graph)
     print(f"Found: {len(file_uris)} attachments for {uuid}")
     for i, share_uri in enumerate(file_uris):
         print(f"Copying is {i + 1} of {len(file_uris)} attachments for {uuid}")
