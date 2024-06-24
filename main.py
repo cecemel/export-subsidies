@@ -296,7 +296,7 @@ def process_data_for_bestuurseenheid(uuid, index, all_uuids, HOST, migrations_fo
     print(f"Fetching all data for bestuurseenheden with uuid: {uuid}")
     print(f"This is {index + 1} of {len(all_uuids)}")
 
-    subsidy_graph = f"http://mu.semte.ch/graphs/organizations/{uuid}/LoketLB-subsidies"
+    subsidy_graph = f"http://mu.semte.ch/graphs/organizations/{uuid}/SubsidiepuntGebruiker"
     subsidy_ttl = get_timestamped_file_name(f'dump-graph-subsidies-{uuid}.ttl')
     get_subsidies_graph(HOST, migrations_folder, subsidy_ttl, subsidy_graph)
     print("Dumped subsidy graph")
